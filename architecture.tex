@@ -265,7 +265,7 @@ First, for a candidate landmark $c$, the street-level image of the maneuver poin
 
 After the worker has submitted the description, a verification HIT is created on MTurk, with three assignments. Each worker will be shown the annotated maneuver point image along with the candidate description and asked to decide whether the description is accurate and meets the criteria of describing “permanent, man-made things--not cars, people or things that could move”. (Two radio buttons are displayed—”yes” and “no”.)
 
- If at least two of the three workers indicate that the description is accurate, the description is accepted, and pipeline execution can continue. If not, the process repeats, with the creation of a new description HIT and subsequent verification HITs. Torchbearer will retry this process up to three times--if no description could be derived, the landmark is removed from the candidate set and pipeline execution continues.
+ If at least two of the three workers indicate that the description is accurate, the description is accepted, and pipeline execution can continue. If at least two of the three workers indicate the landmark is invalid, pipeline execution continues, with this landmark removed from the set of candidates. If the majority of workers indicates that the description is incorrect, or if there is no majority opinion, the description process repeats, with the creation of a new description HIT and subsequent verification HITs. Torchbearer will retry this process up to three times--if no description could be derived, the landmark is removed from the candidate set and pipeline execution continues.
 
 \subsection{Finding landmarks in saliency maps}
 Given a saliency map, it is often important to locate candidate landmarks based on “hot spots”, or highly salient regions, in the map. The significance of this is different for human-based saliency detection than for machine-based saliency detection.
@@ -352,7 +352,7 @@ To find the similarity of a landmark $c$ as compared to all other landmarks in a
 
 \begin{equation}\label{eq:landmrkSimilarityOverall}
     totalSimilarity = \sum\limits_{k \in C} pairSimilarity(k, c)
-\end{eqaution}
+\end{equation}
 
 \section{Pipeline Specifics}
 \subsection{Machine-Machine}

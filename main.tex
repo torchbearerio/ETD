@@ -1,4 +1,4 @@
-\documentclass[thesis]{MSUstyle}
+\documentclass[thesis, appendmultiple]{MSUstyle}
 %
 %  Created by Seth Humphries 
 %  Update and maintained by Prof. Mark Owkes mark.owkes@montana.edu
@@ -51,6 +51,7 @@
 \usepackage[final]{listings} %used for formatting code
 \usepackage[pdftex,hidelinks]{hyperref}
 \usepackage{cite} %compresses the citations so \cite{ref1,ref2,ref3,ref4} is printed as [1-4] instead of [1,2,3,4]
+\usepackage{pdfpages} 
 
 \usepackage{tikz} % used for creating figures
 \usetikzlibrary{calc}
@@ -177,7 +178,7 @@
 % If you have an appendix use either the option appendsingle (1 appendix) or appendmultiple (>1 appendix) in your document class
 % If you do not have an appendix comment out below and remove the appendsingle/multiple option from the document class
 \appendix
-\include{appendixa}
+\include{appendix_consent}
 %\include{appendixb}
 
 \end{document}
