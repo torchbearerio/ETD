@@ -1,6 +1,6 @@
 \chapter{Results}\label{CH:results}
 
-We analyze the Torchbearer system on two fronts: first, we examine the differences between pipelines on a performance and efficiency level, comparing execution cost, execution time and similarity between results. Second, we perform a field study with real drivers using the Torchbearer system to navigate an unknown route, comparing cognitive load, driving performance and perceived task difficulty between all four pipelines and a control. Our aim with these analyses is to understand the effectiveness of human versus machine methodologies for landmark selection and to determine the efficacy of the overall system for improving drivers' cognitive load and performance during naivgation.
+We analyze the Torchbearer system on two fronts: first, we examine the differences between pipelines on a performance and efficiency level, comparing execution cost, execution time and similarity between results. Second, we perform a field study with real drivers using the Torchbearer system to navigate an unknown route, comparing cognitive load, driving performance and perceived task difficulty between all four pipelines and a control. Our aim with these analyses is to understand the effectiveness of human versus machine methodologies for landmark selection and to determine the efficacy of the overall system for improving drivers' cognitive load and performance during navigation.
 
 \section{Pipeline Comparison}
 
@@ -23,7 +23,7 @@ The cost incurred for the processing of each maneuver point is recorded in the T
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.6\textwidth]{images/plot_cost.pdf}
+  \includegraphics[width=\textwidth]{images/plot_cost.pdf}
   \caption{}
   \label{fig:plot:cost}
 \end{figure}
@@ -31,6 +31,8 @@ The cost incurred for the processing of each maneuver point is recorded in the T
 The marginal cost of the Machine-Machine pipeline is \$0.00, with no variance, since of course this pipeline makes no requests of human workers. The results for the Human-Machine pipeline are similarly deterministic---this pipeline requests a single saliency detection HIT with a fixed number of worker assignments (5 in our experiment). The Machine-Human pipeline exhibits not only the highest average cost, but also the highest variance. It is likely that both of these traits are due to the description verification component, which has the potential to repeat the entire description step, introducing non-determinism and increasing the cost of a execution significantly. 
 
 This non-determinism due to verification is also a likely explanation of the variance observed in the Human-Machine pipeline. However, variance is less than the Machine-Human pipeline, which we attribute to humans' seeming ability to select more meaningful landmarks during the saliency step than the SalNet-based saliency approach. In other words, it is possible that the machine approach to saliency sometimes selects salient regions which do not contain an object that can be easily described, and contention is created among and between the describing workers and verification workers. This leads to more "loops" of the description step and a higher execution cost.
+
+The relatively high costs of the human-based pipeline may not render them impractical, however. Since the street-level imagery used buy Torchbearer is not (currently) realtime, updated on a scale of years, a given maneuver point only needs to be processed by Torchbearer on a relatively rare frequency. Thus, if a particular pipeline proves to be expensive but highly useful for drivers, it might be worth bearing that cost on an $n$-year cycle. Of course if realtime imagery is used, the Machine-Machine pipeline may be the only economically viable option. 
 
 \subsection{Execution Time}
 Along with monetary cost, execution time is a cost to using a given pipeline. Using our San Francisco test set, we measure both end-to-end processing time and task-wise execution time.
@@ -40,19 +42,235 @@ We record the start and end timestamps for each execution; the difference betwee
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.6\textwidth]{images/plot_executiontime.pdf}
+  \includegraphics[width=\textwidth]{images/plot_executiontime.pdf}
   \caption{}
   \label{fig:plot:executiontime}
 \end{figure}
 
-The Machine-Machine pipeline exhibits the lowest mean end-to-end execution time by an extreme margin, with very low variance. The pipelines which incorporate human input are, unsurprisingly, slower on order of tens of minutes. They also also exhibit significant variance, which is expected given the relative unpredictability of the human element. Likely for the same reasons we observe a higher marginal cost, we see a longer mean execution time for the Machine-Human pipeline than we do for the Human-Machine pipeline. The Human-Human pipeline has the largest variance, due to the most reliance on human work, and also the highest time. It is interesting to note that the mean time of the Human-Human pipeline is not much higher than that of Machine-Human, implying that the human saliency detection task is relatively fast compared to the human description task.
+The Machine-Machine pipeline exhibits the lowest mean end-to-end execution time by an extreme margin, with very low variance. The pipelines which incorporate human input are, unsurprisingly, slower on order of tens of minutes. They also also exhibit significant variance, which is expected given the relative unpredictability of the human element. Likely for the same reasons we observe a higher marginal cost, we see a longer mean execution time for the Machine-Human pipeline than we do for the Human-Machine pipeline. The mean execution time for the Human-Human and Machine-Human pipelines are similar, again implying that the machine approach to saliency results in more looping, or contention, at the human description step. The Human-Human pipeline has the largest variance, due to the most reliance on human work, and also the highest time. 
+
+Based on these results, it is likely that the only pipeline capable of executing at realtime speeds is the Machine-Machine pipeline. However, there a couple of nuances to consider: first, Mechanical Turk has the potential to become faster as Torchbearer continues to build up a pool of workers. (The more workers, the more likely an already-qualified worker will be at the ready when a Torchbearer HIT is submitted.) During the SF test set simulation, 47 workers completed saliency HITs, 37 completed description HITs and 64 completed verification HITs. Over time, as the reputation of Torchbearer as a fair, well-paying requester grew, and more workers completed the qualification process, more parallelization could occur at the human worker level.
+
+Second, as noted in regards to pipeline cost, the benefits of a realtime pipeline will not be realized unless the street-level imagery source is also realtime, which Google Streetview is not. Indeed, most landmarks are permanent fixtures in the environment, and thus a Torchbearer pipeline only needs to process a given maneuver point whenever the street-level imagery is updated. This means that processing could be batched---an entire city's landmarks could be reevaluated at one time, and the per-maneuver point execution time of a pipeline is not relevant.
+
+\subsection{Execution Time By Task}
+
+For each pipeline, we evaluate the mean time required to complete each task. This gives insight into any bottlenecks that might exist in a pipeline, as well as the effectiveness of any task parallelization that was implemented. Each plot below represents an "average timeline" of execution.
+
+\subsubsection{Machine-Machine}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/timeline_mm.pdf}
+  \caption{}
+  \label{fig:plot:timeline:mm}
+\end{figure}
+
+Figure \ref{fig:plot:timeline:mm} shows that the lion's share of processing time in the Machine-Machine pipeline is devoted to the computer vision saliency (SalNet) task. This is unsurprising, as SalNet is a computationally-intensive algorithm, consisting of convolutional filters being applied across the street-level image many times. We also observe noticeable time reductions by parallelizing the saliency detection, computer vision search and data-driven search tasks.
+
+\subsubsection{Machine-Human}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/timeline_mh.pdf}
+  \caption{}
+  \label{fig:plot:timeline:mh}
+\end{figure}
+
+Figure \ref{fig:plot:timeline:mh} makes clear that the human landmark description task is the bottleneck in the Machine-Human pipeline, accounting for approximately 98\% of total execution time. Parallelization does not provide significant benefits in terms of end-to-end execution time.
+
+\subsubsection{Human-Machine}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/timeline_hm.pdf}
+  \caption{}
+  \label{fig:plot:timeline:hm}
+\end{figure}
+
+Figure \ref{fig:plot:timeline:hm} shows that the Human-Machine pipeline suffers from a single bottleneck in the form of the human saliency task, which is to be expected as all other tasks required no human input. While some tasks are parallelized, the effect of this on the overall execution time is negligible.
+
+\subsubsection{Human-Human}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/timeline_hh.pdf}
+  \caption{}
+  \label{fig:plot:timeline:hh}
+\end{figure}
+
+In Figure \ref{fig:plot:timeline:hh}, it is clear that the two human-based tasks comprise the majority of execution time. The duration of the saliency task is somewhat longer than the description task, which we attribute to the number of workers required as well as the difficulty of each task: the saliency task required a sample of five workers, each of who had to make a somewhat involved decision about where to draw a box. The description task, on the other hand, required a single worker to write a description, and three more to simply approve of what she wrote. While the description task does have the potential to "loop" if the description is rejected, in the single-iteration case this task requires less workers, performing an easier task, than the saliency task does.
+
+\subsection{Selected Landmark Overlap}
+
+Every pipeline eventually selects a landmark, inclusive of a bounding box within the street-level image outlining its location. By comparing the intersection-over-union (IoU) between two landmark bounding boxes we can see to what degree the bounding boxes are selecting the same area. IoU is the ratio of area overlapped by both bounding boxes to the area encompassed by both bounding boxes; thus an IoU of 1 signifies complete agreement, or overlap, and an IoU of 0 indicates no overlap. IoU is expressed as
+
+\begin{equation}
+    IoU = \frac{area(intersection(b_1,b_2))}{area(union(b_1,b_2))}
+\end{equation}
+
+where $b_1$ and $b_2$ are the bounding boxes of two selected landmarks. Figure \ref{fig:iou} shows the intersection and the union of two hypothetical bounding boxes.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/iou.pdf}
+  \caption{The intersection (right) and union (center) of a pair of hypothetical bounding boxes (left). The black area selection represents the area of the given metric.}
+  \label{fig:iou}
+\end{figure}
+
+For each maneuver point in the SF test set, we compute the IoU between the selected landmark returned from each pipeline. Table \ref{tab:iou} shows the mean IoU between each pair of pipelines across all maneuver points. This is essentially a measure of how likely two pipelines were to select the same landmark, or, looked at another way, the agreement between two pipelines in terms of landmark saliency.
+
+The mean IoU between landmarks selected by the Machine-Machine and Human-Machine pipelines is the highest, at 0.65; which we largely attribute to the pipelines' identical method of selecting candidate landmarks--object detection via Faster-RCNN and FourSquare venue search. Interestingly, the methods used for determining saliency, and selecting the best landmark, vary: while Human-Machine considers only saliency as determined by human workers, Machine-Machine considers a componentized saliency score with input from SalNet and semantic saliency based on checkins and ubiquity. This implies that, at least to some degree, humans agree with our componentized saliency method in regards to what makes the best landmark.
+
+A high IoU also exists between the Machine-Machine and Machine-Human pipelines, suggesting agreement between the salient regions generated by SalNet, which define the candidate landmark set for the Machine-Human pipeline, and the object-detection algorithm and/or the FourSquare venue search, which together build the candidate set for the Machine-Machine pipeline.
+
+For other pipeline combinations, the mean IoU is low enough that is unlikely to be more significant than random chance. 
+
+\begin{table}[htbp]
+  \centering
+  \caption{Mean Intersection Over Union of Selected Landmark}
+  \label{tab:iou}
+  {\tabulinesep=2mm
+    \begin{singlespace}
+    \begin{tabu} to \textwidth{|X[c]||X[c]|X[c]|X[c]|}
+    \hline
+                & Machine-Human & Human-Machine & Human-Human \\
+                \hline\hline
+Machine-Machine   & 0.35        & 0.65          & 0.08          \\
+\hline
+Machine-Human &             & 0.07          & 0.09          \\
+\hline
+Human-Machine   &             &               & 0.05 
+\\
+    \hline
+    \end{tabu}
+    \end{singlespace}
+    }
+\end{table}
+
+\subsection{Description Similarity}
+
+Pipelines use two separate methods for describing candidate landmarks: human-based, in which human workers provide free-form text in response to an image of the landmark, and machine-based, where the description is generated by an object-detection algorithm or the venue description in a database. To analyze the similarity between descriptions generated for identical landmarks across pipelines, we leverage the same word embedding approach used for computing landmark uniqueness (see \ref{sec:unique}. 
+
+Considering only those landmarks which had an IoU of greater than 0.5, we compute the vector space embedding for each generated description, and then find the cosine similarity between those two embeddings. Table \ref{tab:descriptionsimilarity} reports the mean cosine similarity between landmark description for each pair of pipelines.
+
+[Discuss]
+
+\begin{table}[htbp]
+  \centering
+  \caption{Mean Cosine Similarity Between Selected Landmarks (normalized between [0,1])}
+  \label{tab:descriptionsimilarity}
+  {\tabulinesep=2mm
+    \begin{singlespace}
+    \begin{tabu} to \textwidth{|X[c]||X[c]|X[c]|X[c]|}
+    \hline
+                & Machine-Human & Human-Machine & Human-Human \\
+                \hline\hline
+Machine-Machine & 0.21 & 0.68 & 0.19 \\
+    \hline
+Machine-Human   &      & 0.17 & 0.56 \\
+    \hline
+Human-Machine   &      &      & 0.18
+\\
+    \hline
+    \end{tabu}
+    \end{singlespace}
+    }
+\end{table}
 
 \section{Field Experiments}
 
-To evaluate the efficacy of each of our approaches for reducing driver cognitive load and improving driving performance, we conduct a naturalistic driving study (real driver, real vehicles, real roads) in which subjects navigate an unknown route using the Torchbearer system. It must be noted up front that, due to constraints on time and resources, a full-scale human factors study is out of the scope of this work. While the experimental design we discuss could be applied to a larger sample and yield significant results, here we use a sample size of only five human subjects. Along with contributing a experimental design for future work, this small-scale study provides anecdotal evidence as to the effectiveness of the Torchbearer system.
+To evaluate the efficacy of each of our approaches for reducing driver cognitive load and improving driving performance, we conduct a naturalistic driving study (real driver, real vehicles, real roads) in which subjects navigate an unknown route using the Torchbearer system. It must be noted up front that, due to constraints on time and resources, a full-scale human factors study is out of the scope of this work. While the experimental design we discuss could be applied to a larger sample and potentially yield significant results, here we use a sample size of only five human subjects. Along with contributing a experimental design for future work, this small-scale study provides anecdotal evidence as to the effectiveness of the Torchbearer system.
 
-\subsectino{Experimental Design}
+\subsection{Experimental Design}
 
 We evaluate each of Torchbearer's four pipelines against a control pipeline which delivers instructions containing no landmarks. The control pipeline is comparable to a mainstream navigation application, such as Google Maps, which provides only street names and distances in its instructions.
 
-Five subjects drove an identical route through downtown Bozeman, Montana, using only the Torchbearer app for navigation. This route was divided into five legs, and a different pipeline was used for each leg. The subject was given no information about the route prior to the start of driving.
+Using a within-subjects design, five subjects drove an identical route through downtown Bozeman, Montana, using only the Torchbearer app for navigation (shown in \ref{fig:route}). This route was divided into five legs, with a different pipeline being used for navigation of each leg. After the completion of each leg, the subject was given asked to complete the NASA-TLX survey.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/route.pdf}
+  \caption{The route driven by subjects through Bozeman, Montana. Each color represents a different leg. Each leg is navigated using a different pipeline.}
+  \label{fig:route}
+\end{figure}
+
+The subject was given no information about the route prior to the start of driving; the only information they were given throughout the drive was spoken by the Torchbearer app. 
+
+Our experiment has two sources of nuisance variability, or blocking factors: the route leg and the subject (driver). Each leg of the route is likely to have differences in road type, normal traffic levels and availability of good landmarks. Subjects vary in their driving abilities, driving style (tendency to brake hard, turn quickly, etc.) and preexisting knowledge of the area in which the experiment is conducted. All of these characteristics can have an undesired effect on the variable of interest. 
+
+To control for these two blocking factors, we use a Latin squares design, which allows for controlling two sources of variation---subject and route leg---and isolates the treatment effect (pipeline). This is accomplished by requiring that each pipeline be analyzed on all route legs an equal number of times, and also that each subject be treated with each pipeline an equal number of times. A Latin square can be thought of as an $n$ by $n$ matrix, where rows represent a subject and columns represent a route leg, and $n$ is equal to the number of pipelines, subjects and route legs (five).
+
+The standard Latin squares design does not control for the effects of treatment order---the carryover effect of subjects always being treated with pipeline $x$ after pipeline $y$--so we use a counterbalanced Latin square, which carries the additional stipulation that each pipeline must be preceded by and followed by every other pipeline an equal number of times. That is, if $p_y$ is \textit{preceded} by $p_x$ for one subject, $p_y$ must be \textit{followed} by $p_x$ for exactly one subject.
+
+Because we have an odd number of treatments (four Torchbearer pipelines and one control pipeline) it is not possible to achieve the counterbalancing stipulation within an $n$ by $n$ Latin square. Instead, two $n$ x $n$ Latin squares, with the second being a vertical reflection of the first, are required. This results in a $2n$ by $n$ matrix, still with $n$ route legs and $n$ pipelines, but now requiring $2n = 10$ subjects. Because the scope of our study is limited to 5 subjects, we counterbalance the $5$ by $5$ to the greatest extent possible, but still have some immediate orderings which do not have the reverse represented in the square. This is a weakness of our study, and an argument in favor of future work with a larger pool of subjects, but we argue it will not threaten validity to a greater extent than the small sample size. Our Latin square design is displayed in Table \ref{tab:latinsquares}.
+
+Using the Latin square design, we arrive at the following statistical model:
+
+\begin{equation}\label{eq:model}
+    Y_{ijk} = \overline{Y} + P_i + R_j + S_k + e_{ijk}
+\end{equation}
+
+where $\overline{Y}$ is the grand mean, $P_i$ is the pipeline (treatment) effect for a particular pipeline $i$, $R_j$ is the route leg effect for a particular route leg $j$, $S_k$ is the subject effect for a particular subject $k$, $e$ is the error term and $Y_{ijk}$ is an observation for a particular subject, route leg and pipeline.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Counterbalanced Latin Squares Design}
+  \label{tab:latinsquares}
+  {\tabulinesep=2mm
+    \begin{singlespace}
+    \begin{tabu} to \textwidth{|X[c]||X[c]|X[c]|X[c]|X[c]|X[c]|}
+        \hline
+        & Leg 1 & Leg 2 & Leg 3 & Leg 4 & Leg 5 \\
+        \hline\hline
+        Subject 1 & No landmarks    & Human-Human     & Machine-Machine & Human-Machine   & Machine-Human   \\
+                \hline
+        Subject 2 & Human-Human     & Human-Machine   & No landmarks    & Machine-Human   & Machine-Machine \\
+                \hline
+        Subject 3 & Human-Machine   & Machine-Human   & Human-Human     & Machine-Machine & No landmarks    \\
+                \hline
+        Subject 4 & Machine-Human   & Machine-Machine & Human-Machine   & No landmarks    & Human-Human     \\
+                \hline
+        Subject 5 & Machine-Machine & No landmarks    & Machine-Human   & Human-Human     & Human-Machine   \\
+    \hline
+    \end{tabu}
+    \end{singlespace}
+    }
+\end{table}
+
+\subsubsection{Peripheral Detection Task}
+
+To measure the effect of pipelines' landmark descriptions on cognitive load, we use a peripheral detection task (PDT). This secondary task consists of subjects wearing a headset which positions an LED light approximately 15 degrees to the left of the center of vision and 2 degrees above the horizon. This light blinks at a uniform random interval between 3 and 5 seconds, for a duration of between 200 and 1000 milliseconds. A button is attached to the subject's finger, which can be pressed against the steering wheel. The subject is asked to depress the button as quickly as possible whenever they see the light blink. The average delay between light blink and button depression is recorded, along with a miss rate---if the subject fails to press the button within 2 seconds of a light blink, it counts as a miss. Intuitively, the more cognitive effort the subject must expend on the primary task of navigation and vehicle operation, the less effort they can put towards the PDT. Thus, a more cognitively-intensive primary task will result in a higher miss rate and longer button press delay.
+
+The PDT must be evaluated on two levels---first the miss rate, the probability of a subject never pressing the button within 2 seconds of the LED blinking, and second the mean response time for non-missed blinks.
+
+Using an Analysis of Variance (ANOVA) evaluation based on the linear model in Equation \ref{eq:model}, where $\overline{Y}$ is the PDT response time, we found no evidence supporting a difference in mean PDT response time between pipelines ($F(4, 12) = 1.38$, $p=0.29$). Figure \ref{fig:plot:responsetime} shows that differences in the mean are small relative to the large interquartile range.
+
+We also found no evidence of pipeline affecting PDT miss rate ($F(4, 12) = 0.46$, $p=0.76$), using the same analysis as for response time. Figure \ref{fig:plot:missrate}  shows the distribution of miss rate by pipeline.
+
+\subsubsection{Gravitational Force Events}
+We also monitor for erratic, harsh, potentially dangerous driving patterns, by counting instances of high lateral ($X$) and longitudinal ($Y$) gravitational forces (G-forces). These G-force spikes can signify harsh breaking, rapid acceleration or swerving. Specifically, we count the number of times during a route leg that the vehicle experienced a G-force of greater magnitude than the thresholds set forth in Table \ref{tab:acc}. G-forces are measured in the $X$ and $Y$ directions using a Freematics ONE vehicle data logger, which includes 3-axis acceleration data and is anchored to the vehicle frame via the vehicle's OBD-II port.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Gravitational Force Event Thresholds (Naturalistic Teenage Driving Study \cite{doi:10.1093/aje/kwr440})}
+  \label{tab:acc}
+  {\tabulinesep=2mm
+    \begin{singlespace}
+    \begin{tabu} to \textwidth{|X[c]|X[c]|X[c]|}
+        \hline
+        Event Type & Axis & Threshold (G) \\
+        \hline\hline
+        Harsh acceleration & $Y$ & $>0.35$ \\
+        \hline
+        Hard braking & $Y$ & $<-0.45$ \\
+        \hline
+        Right swerve & $X$ & $>0.05$ \\
+        \hline
+        Left swerve & $X$ & $<-0.0.5$ \\
+    \hline
+    \end{tabu}
+    \end{singlespace}
+    }
+\end{table}
+
+
+
+\subsubsection{Surveys}
+Lastly, we survey subjects using the NASA-TLX survey \cite{hart1988development} and our own Likert-scale survey to analyze perceived task difficulty as well as perceived landmark goodness, navigation confidence navigation difficulty between pipelines.

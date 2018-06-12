@@ -4,7 +4,7 @@
 The goal of the Torchbearer system is simple: given the latitude, longitude and approach bearing of a maneuver point, render a string describing the most salient landmark at that location. The problem which Torchbearer solves can be expressed as simply
 
 \begin{equation}\label{eq:problem}
-    f(lat, long, bearing) \longrightarrow landmark
+    f(lat, long, bearing) \longrightarrow description
 \end{equation}
 
 where $f$ is some method of landmark selection and description. The Torchbearer system provides multiple implementations of $f$, which we call pipelines. Each pipeline consists of an ordered set of tasks, $T$. Each task $t_i \in T$ accepts some input from the previous task $t_{i-1}$ and returns some output to be input to the next task $t_{i+1}$---the obvious exceptions being the first task, which takes a tuple $(lat, long, bearing)$ as input, and the last task, which outputs the selected landmark, inclusive of description---the final result of the pipeline. Each task progressively solves a small part of the landmark selection problem, such that at the end of the pipeline a lexical description of the most suitable landmark has been determined. It is natural to consider a pipeline as a composition of functions:
@@ -14,6 +14,15 @@ where $f$ is some method of landmark selection and description. The Torchbearer 
 \end{equation}
 
 where $n \equiv \mid T \mid$. As an implementation detail, it is important to note that tasks can be performed in parallel if they all take the same input form the previous task. Examples of such parallelization will be seen in the descriptions of each specific pipeline.
+
+
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{images/Arch.pdf}
+  \caption{A high-level view of the Torchbearer system.}
+  \label{fig:pipeline:overview}
+\end{figure}
 
 \section{Input and Output}\label{sec:arch:io}
 In general, a task receives a tuple $X$ as its input and yields a tuple $Y$ as its output. A task’s output must be inclusive of its inputs, that is, $X \subset Y$. Let $p_+ = Y \setminus X$, then $p_+$ is the context contribution of a given task--the information which that state has added to the pipeline's overall knowledge, or state. A task does not necessarily need to make a context contribution--some tasks perform important functions that do not lend any additional knowledge directly, but rather complete operations which are  prerequisites for future tasks (such as downloading an image).
@@ -72,7 +81,7 @@ A client (generally an end user's mobile phone) calls this endpoint both to dete
 
 When RM receives this type of request, it must first determine the shortest-path route between the origin and destination points. This is accomplished by querying Mapbox, a third-party service which offers a public street routing API. While there are no special requirements for the routing algorithm Torchbearer uses, Mapbox was chosen for its unique trait of including approach bearings for each maneuver point. Another routing service, or a custom solution, could be easily integrated into Torchbearer in place of Mapbox, so long as it accepts origin and destination coordinates as input and returns a list of maneuver points each consisting of latitude, longitude, approach bearing and maneuver type (right turn, left turn, merge, etc.)
 
-Once the route has been determined, RM queries the Torchbearer database for each maneuver point. If the maneuver point exists in the Torchbearer system, and has already been processed by the specified pipeline, the computed landmark description will be returned in the response. If the maneuver point does not exist, RM inserts a record for it into the database. If it has not yet been processed by the specified pipeline, RM initiates such processing by sending an HTTP POST request to the Orchestrator of that pipeline. The list of maneuver points can then be returned to the cleint.
+Once the route has been determined, RM queries the Torchbearer database for each maneuver point. If the maneuver point exists in the Torchbearer system, and has already been processed by the specified pipeline, the computed landmark description will be returned in the response. If the maneuver point does not exist, RM inserts a record for it into the database. If it has not yet been processed by the specified pipeline, RM initiates such processing by sending an HTTP POST request to the Orchestrator of that pipeline. The list of maneuver points can then be returned to the client.
 
 It is important to note that while this endpoint will immediately return all maneuver points for a route, not all maneuver points will necessarily have been processed by the given pipeline. If a point has not yet been processed, it will not be returned with a landmark description, and the client will need to ask RM for an updated description at later time using the \texttt{GET /maneuverpoint/landmark} endpoint.
 
@@ -189,11 +198,11 @@ $m$, the width of maneuver point image;
 $n$, the height of maneuver point image; \\
 \textbf{Output}: $S$, a matrix of dimension $m$ by $n$ 
 \begin{algorithmic}[1]
-\State $S\gets 0_{m,n}$
-\For{$b \in B$}
-\State $S[b.y1:b.y2, b.x1:b.x2] += 1$
-\EndFor
-\Return{$B$}
+\STATE $S\gets 0_{m,n}$
+\FOR {$b \in B$}
+    \STATE $S[b_{y1}:b_{y2}, b_{x1}:b_{x2}] \mathrel{+}= 1$
+\ENDFOR
+\RETURN{$B$}
 \end{algorithmic}
 \caption{Creating a saliency map from human input}\label{alg:saliencyMap}
 \label{alg:saliencyMap}
@@ -223,7 +232,7 @@ The second half of the landmark selection problem consists of deriving a lexical
 \subsubsection{The Machine Approach}
 Torchbearer leverages two approaches for finding semantically salient landmarks and quantifying their salience: a data driven approach, which uses a geosocial datasource to estimate the local significance of business and points of interest, and a deep learning-based object detection algorithm which searches for known semantically salient features in maneuver point images.
 	
-\subsubsubsection{Data-driven Approach}
+\subsubsection{Data-driven Approach}
 Torchbearer estimates the semantic saliency of a landmark via an estimate of the number of people who have recently visited the landmark, as counted by the social networking application FourSquare. Previous work has shown the efficacy of using geosocial streams as a proxy for the local importance of a landmark; the intuition being that the more people who have “checked in” to a given location, the more well-known, or prominent, it is \cite{quesnot2014measure}. FourSquare incorporates businesses, points of interest and publicly accessible places into its ecosystem; these are known as venues. User location is recorded transparently, without the need for them to explicitly tap a "check in" button Torchbearer leverages FourSquare’s venue data both to find candidate landmarks and determine their semantic saliency. 
 
 To find candidate landmarks for a given maneuver point, Torchbearer queries FourSquare for venues which are within a given radius of the maneuver point. By default, a small 100-foot radius is used, in the aim of ensuring any returned venue will be on or near the road upon which the maneuver point is located. FourSquare returns a list of tuples consisting of the venue name, the type of venue (such as restaurant, gas station, etc.) the geographic coordinates and the number of FourSquare users who have “checked in” to that venue. 
@@ -237,7 +246,7 @@ Each of these venues is converted to a Landmark: the landmark's description is t
 
 This measure captures both the local significance and wide-area ubiquity of the landmark.
 
-\subsubsubsection{Object detection approach}
+\subsubsection{Object detection approach}
 Some landmarks are ubiquitous and proven to be highly semantically salient, independent of the maneuver point's geographic location. Road infrastructure, such as stop signs and traffic lights, is a prime example: these landmarks are universally recognizable among drivers, and have been shown to serve as excellent landmarks for use in navigation instructions \cite{may_ross_bayer_2005}. Unfortunately, we found no dataset of street signage or traffic lights with coverage beyond a specific locality. Instead, we leverage a state-of-the-art object detection algorithm, Faster-RCNN, to detect stop signs and traffic lights at maneuver points. Note that as a direction for future research, extending the object detection model to include other types of landmarks is both feasible and potentially beneficial.
 
 Faster-RCNN (FRCNN) \cite{ren2015faster} is a deep, region-based, convolutional neural network which takes an image as input and yields a set of bounding boxes, class labels (a string denoting which object the region was classified as) and confidence scores for objects of interest detected within the image. It is currently one of the highest performing classifiers in terms of both speed and accuracy, 
@@ -342,7 +351,7 @@ To find the similarity between two landmark description phrases, we compute a de
 where $embedding$ is the word2vec vector for the given word and $c$ is the cosine similarity function of two vectors $v_1$ and $v_2$:
 
 \begin{align}\label{eq:cosineSimilarity}
-    c &= (v_1, v_2) \longrightarrow cos(\theta)
+    c &= (v_1, v_2) \longrightarrow cos(\theta) \\
       &= (v_1, v_2) \longrightarrow \frac{A \cdot B}{\parallel A \parallel \parallel B \parallel}
 \end{align}
 
@@ -357,8 +366,8 @@ To find the similarity of a landmark $c$ as compared to all other landmarks in a
 \section{Pipeline Specifics}
 \subsection{Machine-Machine}
 
-\textbf{Input}: $I_0 = (latitude, longitude, bearing)$
-\textbf{Output}: The most salient landmark, including a description for use in navigation instructions
+\noindent \textbf{Input}: $X_0 = (latitude, longitude, bearing)$\\
+\textbf{Output}: The most salient landmark, including a description for use in navigation instructions\\
 \textbf{Candidate selection}: Description
 
 \begin{figure}[htbp]
@@ -368,36 +377,35 @@ To find the similarity of a landmark $c$ as compared to all other landmarks in a
   \label{fig:pipeline:mm}
 \end{figure}
 
-\subsubsection*{Step 1: Load Streetview Image}
-\textbf{Input}: $X_0 = (latitude, longitude, bearing)$
-\textbf{Output}: $Y_0 = (latitude, longitude, bearing, [image_urls])$
+\subsubsection*{Step 1: Load Streetview Image}~\\
+\noindent \textbf{Input}: $X_0 = (latitude, longitude, bearing)$\\
+\textbf{Output}: $Y_0 = (latitude, longitude, bearing, [image\_urls])$
 
 This step consists of querying the Google Streetview API for street-level imagery at distances of 25, 50 and 100 feet from the given coordinate at an angle opposite of the bearing. (We refer to these distances relatively as “at”, “just before” and “before”.) Returned images are stored on Amazon Simple Storage Service (S3), and the S3 URL of each image is added to a tuple which is included in the output of this step. 
 
-\subsubsection*{Step 2a: Computer Vision Saliency Detection}
-\textbf{Input}: $X_{2a} = Y_0 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_{2a} = (latitude, longitude, bearing, [image_urls], [saliency_matrices])$ 
+\subsubsection*{Step 2a: Computer Vision Saliency Detection}~\\
+\noindent\textbf{Input}: $X_{2a} = Y_0 = (latitude, longitude, bearing, [image\_urls])$\\
+\textbf{Output}: $Y_{2a} = (latitude, longitude, bearing, [image\_urls], [saliency\_matrices])$ 
 
 Implementing the machine approach methodology outlined in the Saliency section, this step uses the SalNet deep learning architecture to compute a saliency map for each image in the tuple of images in $X_{2a}$. The processing of each image happens in parallel, and consists of feeding the the street-level image through SalNet and capturing the output.
 
 For each image, this step yields a one-dimensional matrix of the same shape as the input image, with values ranging between 0 and 255, inclusive. Each matrix is included in the output tuple provided to subsequent pipeline steps.
 
-\subsubsection*{Step 2b: Computer Vision Landmark Search}
-\textbf{Input}: $X_{2b} = Y_0 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_{2b} = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks] )$ 
+\subsubsection*{Step 2b: Computer Vision Landmark Search}~\\
+\noindent\textbf{Input}: $X_{2b} = Y_0 = (latitude, longitude, bearing, [image\_urls])$\\
+\textbf{Output}: $Y_{2b} = (latitude, longitude, bearing,  [image\_urls], [candidate\_landmarks] )$ 
 
 This step uses the Faster RCNN-based object recognition algorithm, described in the Saliency section, to detect candidate landmarks in each maneuver point image. The network has been trained to detect stop signs and stop lights; it returns, for each object it detects, a tuple consisting of the coordinates of the object’s bounding box within the image, a confidence score between 0 and 1 and a description (label) for the object. We discard any objects with a confidence score less than 0.8 based on the notion that it is better from a usability standpoint to not provide a landmark description in an instruction than it is to provide a description of a nonexistent landmark. The remaining objects are converted into candidate landmark tuples, with a semantic saliency score of 1.0. (We assume that all users are fully aware of what a stop sign or stoplight looks like, thus no other landmark can be more semantically salient than a landmark detected by this step.) These landmarks are included in the output of this step.
 
-\subsubsection*{Step 2c: Data-driven Landmark Search}
-\textbf{Input}: $X_{2c} = Y_0 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_{2c} = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks], [saliency_matrices] )$ 
+\subsubsection*{Step 2c: Data-driven Landmark Search}~\\
+\textbf{Input}: $X_{2c} = Y_0 = (latitude, longitude, bearing, [image_urls])$\\
+\noindent\textbf{Output}: $Y_{2c} = (latitude, longitude, bearing,$ \\ $[image\_urls], [candidate\_landmarks], [saliency\_matrices] )$
 
 This step uses FourSquare to find candidate landmarks by searching for venues within a 50-foot radius of the maneuver point, as detailed in the Saliency section. Candidate landmarks are included in the output tuple.
 
-\subsubsection*{Step 3: Visual Saliency Scoring}
-
-\textbf{Input}: $X_3 = Y_{2a} \cup Y_{2b} \cup Y_{2c} = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_3 = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks] )$ 
+\subsubsection*{Step 3: Visual Saliency Scoring}~\\
+\textbf{Input}: $X_3 = Y_{2a} \cup Y_{2b} \cup Y_{2c} = (latitude, longitude, bearing,  [image\_urls],$\\ $[saliency\_maps], [candidate\_landmarks] )$\\
+\noindent\textbf{Output}: $Y_3 = (latitude, longitude, bearing,  [image\_urls], [candidate\_landmarks] )$ 
 
 This step assigns a quantitative score to each candidate landmark designating its visual saliency in the context of the maneuver point image. The computer-vision based saliency detection approach is not landmark-aware; that is, it determines relative saliency at the pixel-level. This step aggregates these pixel-level values into a score for the entire landmark. Given the bounding box coordinates $x_1, x_2, y_1,y_2$ of a candidate landmark and the saliency map $S$ of the maneuver point, the visual saliency score of that candidate is calculated as
 
@@ -418,10 +426,9 @@ To locate salient regions, we use the watershed-based approach described previou
   \label{fig:pipeline:mm}
 \end{figure}
 
-\subsubsection*{Step 4: Select Most Salient Landmark}
-
-\textbf{Input}: $X_4 = Y_3 = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_4 = (latitude, longitude, bearing, best_landmark)$ 
+\subsubsection*{Step 4: Select Most Salient Landmark}~\\
+\noindent\textbf{Input}: $X_4 = Y_3 = (latitude, longitude, bearing,  [image\_urls],$\\ $[saliency\_maps], [candidate\_landmarks] )$\\
+\textbf{Output}: $Y_4 = (latitude, longitude, bearing, best\_landmark)$ 
 
 At this point in the pipeline, we have a set of candidate landmarks, each complete with both a visual and semantic saliency score. In order to determine the best, most salient landmark, we must first determine the uniqueness saliency score for each candidate, calculated via the method described in \ref{sec:unique}. Next, we normalize each of the three saliency scores to a value between 0 and 1. Given a set of candidate landmarks $C$, the normalized score for a given saliency component (visual, semantic or structural) for a given landmark $c$ can be found by
 
@@ -439,16 +446,15 @@ where $S_v$ is the visual saliency score, $S_s$ the semantic saliency score, and
 
 The candidate landmark with the highest summed scores is the best, most salient landmark, and is the output of this step. The description of this landmark will be included in navigation instructions spoken to the user.
 
-\subsubsection*{Step 5: Cleanup}
-
-\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing, best_landmark)$
-\textbf{Output}: $Y_5 = (best_landmark)$
+\subsubsection*{Step 5: Cleanup}~\\
+\noindent\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing, best\_landmark)$\\
+\textbf{Output}: $Y_5 = (best\_landmark)$
 
 This final step consists of system cleanup tasks. All intermediate images stored on S3 are removed--namely, street level imagery. The best landmark is stored in a database, associated with the maneuver point and pipeline identifier for future retrieval.
 
-\subsection{Human-Machine}
-\textbf{Input}: $X_0 = (latitude, longitude, bearing)$
-\textbf{Output}: The most salient landmark, including a description for use in navigation instructions
+\subsection{Human-Machine}~\\
+\noindent\textbf{Input}: $X_0 = (latitude, longitude, bearing)$\\
+\noindent\textbf{Output}: The most salient landmark, including a description for use in navigation instructions\\
 \textbf{Candidate selection}: Description
 
 \begin{figure}[htbp]
@@ -458,56 +464,54 @@ This final step consists of system cleanup tasks. All intermediate images stored
   \label{fig:pipeline:hm}
 \end{figure}
 
-\subsubsection*{Step 1: Load Streetview Image}
-\textbf{Input}: $X_1 = X_0 = (latitude, longitude, bearing)$
-\textbf{Output}: $Y_1 = (latitude, longitude, bearing, [image_urls])$
+\subsubsection*{Step 1: Load Streetview Image}~\\
+\noindent\textbf{Input}: $X_1 = X_0 = (latitude, longitude, bearing)$\\
+\textbf{Output}: $Y_1 = (latitude, longitude, bearing, [image\_urls])$
 
 This step is implemented in the same manner as Step 1 of the Machine-Machine pipeline.
 
-\subsubsection*{Step 2a: Human Saliency Detection} 
-\textbf{Input}: $X_{2a} = Y_1 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_{2a} = (latitude, longitude, bearing, [image_urls], [saliency_matrices])$ 
+\subsubsection*{Step 2a: Human Saliency Detection}~\\ 
+\noindent\textbf{Input}: $X_{2a} = Y_1 = (latitude, longitude, bearing, [image\_urls])$\\
+\textbf{Output}: $Y_{2a} = (latitude, longitude, bearing, [image\_urls], [saliency\_matrices])$ 
 
 This step generates a saliency matrix for the maneuver point, based off of the street-level image. This implementation uses the crowdsourcing approach described in the Saliency section, and leverages human intuition about what constitutes a good landmark. The saliency map generated is therefore not specific to a single component of landmark saliency (visual, semantic or structural) but comprises the entire saliency metric. 
 
 The output of this step is a matrix of the same dimensions as the input maneuver point image; each element is a value between 0 and 255 indicating the relative saliency at that point in the image.
 
-\subsubsection*{Step 2b: Computer Vision Landmark Search}
-\textbf{Input}: $X_{2b} = Y_1 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_{2b} = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks] )$ 
+\subsubsection*{Step 2b: Computer Vision Landmark Search}~\\
+\noindent\textbf{Input}: $X_{2b} = Y_1 = (latitude, longitude, bearing, [image\_urls])$\\
+\textbf{Output}: $Y_{2b} = (latitude, longitude, bearing,  [image\_urls], [candidate\_landmarks] )$ 
 
 This step is implemented in the same manner as Step 2b of the Machine-Machine pipeline.
 
-\subsubsection*{Step 2c: Data-driven Landmark Search}
-\textbf{Input}: $X_{2c} = Y_1 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_{2c} = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks], [saliency_matrices] )$ 
+\subsubsection*{Step 2c: Data-driven Landmark Search}~\\
+\noindent\textbf{Input}: $X_{2c} = Y_1 = (latitude, longitude, bearing, [image\_urls])$\\
+\textbf{Output}: $Y_{2c} = (latitude, longitude, bearing,  [image\_urls], $\\$[candidate\_landmarks], [saliency\_matrices] )$ 
 
 This step is implemented in the same manner as Step 2c of the Machine-Machine pipeline.
 
-\subsubsection*{Step 3: Visual Saliency Scoring}
-
-\textbf{Input}: $X_3 = Y_2 = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_3 = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks] )$ 
+\subsubsection*{Step 3: Visual Saliency Scoring}~\\
+\noindent\textbf{Input}: $X_3 = Y_{2a} \cup Y_{2b} \cup Y_{2c} = (latitude, longitude, bearing,  [image\_urls],$\\$ [saliency\_maps], [candidate\_landmarks] )$\\
+\textbf{Output}: $Y_3 = (latitude, longitude, bearing,  [image\_urls], [candidate\_landmarks] )$ 
 
 This step is implemented in the same manner as Step 3 of the Machine-Machine pipeline.
 
-\subsubsection*{Step 4: Select Most Salient Landmark}
-
-\textbf{Input}: $X_4 = Y_3 = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_4 = (latitude, longitude, bearing, best_landmark)$
+\subsubsection*{Step 4: Select Most Salient Landmark}~\\
+\noindent\textbf{Input}: $X_4 = Y_3 = (latitude, longitude, bearing,  [image\_urls], $\\$[saliency\_maps], [candidate\_landmarks] )$\\
+\textbf{Output}: $Y_4 = (latitude, longitude, bearing, best\_landmark)$
  
 The candidate landmark with the highest human saliency score is the best, most salient landmark, and is the output of this step. The description of this landmark will be included in navigation instructions spoken to the user.
 
-\subsubsection*{Step 5: Cleanup}
+\subsubsection*{Step 5: Cleanup}~\\
+\noindent\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing, best_landmark)$\\
+\textbf{Output}: $Y_5 = (best\_landmark)$
 
-\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing, best_landmark)$
-\textbf{Output}: $Y_5 = (best_landmark)$
 This step is implemented in the same manner as Step 5 of the Machine-Machine pipeline.
 
 \subsection{Machine-Human}
-\textbf{Input}: $X_0 = (latitude, longitude, bearing)$
-\textbf{Output}: The most salient landmark, including a description for use in navigation instructions
-\textbf{Candidate selection}: Saliency
+\noindent\textbf{Input}: $X_0 = (latitude, longitude, bearing)$\\
+\noindent\textbf{Output}: The most salient landmark, including a description for use in navigation instructions\\
+\noindent\textbf{Candidate selection}: Saliency
 
 \begin{figure}[htbp]
   \centering
@@ -516,57 +520,53 @@ This step is implemented in the same manner as Step 5 of the Machine-Machine pip
   \label{fig:pipeline:mh}
 \end{figure}
 
-\subsubsection*{Step 1: Load Streetview Image}
-\textbf{Input}: $X_1 = X_0 = (latitude, longitude, bearing)$
-\textbf{Output}: $Y_1 = (latitude, longitude, bearing, [image_urls])$
+\subsubsection*{Step 1: Load Streetview Image}~\\
+\noindent\textbf{Input}: $X_1 = X_0 = (latitude, longitude, bearing)$\\
+\textbf{Output}: $Y_1 = (latitude, longitude, bearing, [image\_urls])$
 
 This step is implemented in the same manner as Step 1 of the Machine-Machine pipeline.
 
-\subsubsection*{Step 2: Computer Vision Saliency Detection}
-\textbf{Input}: $X_2 = Y_0 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_2 = (latitude, longitude, bearing, [image_urls], [saliency_matrices])$ 
+\subsubsection*{Step 2: Computer Vision Saliency Detection}~\\
+\noindent\textbf{Input}: $X_2 = Y_0 = (latitude, longitude, bearing, [image\_urls])$\\
+\textbf{Output}: $Y_2 = (latitude, longitude, bearing, [image\_urls], [saliency\_matrices])$ 
 
 This step is implemented in the same manner as Step 2a of the Machine-Machine pipeline.
 
-\subsubsection*{Step 3a: Create annotated maneuver point images}
-\textbf{Input}: $X_{3a} = Y_2 = (latitude, longitude, bearing, [image_urls], [saliency_matrices])$ 
-\textbf{Output}: $Y_{3a} = (latitude, longitude, bearing, [image_urls], [saliency_matrices], [annotated_image_urls])$ 
+\subsubsection*{Step 3a: Create annotated maneuver point images}~\\
+\noindent\textbf{Input}: $X_{3a} = Y_2 = (latitude, longitude, bearing, [image\_urls], [saliency\_matrices])$ \\
+\textbf{Output}: $Y_{3a} = (latitude, longitude, bearing, [image\_urls],$\\$ [saliency\_matrices], [annotated\_image\_urls])$ 
 
 In order for human workers to provide written descriptions for candidate landmarks, they need to see an image of the maneuver point with the candidate landmark outlined. We choose to show workers an annotated image of the entire maneuver point, as opposed to a cropped image containing only the candidate landmark, so that workers can incorporate context into their descriptions. For example, we have observed descriptions such as “one story blue house next to the oak tree” and “stop sign near the crosswalk”.
 
 For each candidate $c$ in the set of candidate landmarks $C$, we generate an image which contains a 3-pixel thick red border drawn around the bounding box of $c$. These images are stored on S3, and the URLs are included in the output of this step.
 
-\subsubsection*{Step 3b: Visual Saliency Scoring}
-
-\textbf{Input}: $X_{3b} = Y_2 = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_{3b} = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks] )$ 
+\subsubsection*{Step 3b: Visual Saliency Scoring}~\\
+\noindent\textbf{Input}: $X_{3b} = Y_2 = (latitude, longitude, bearing,  [image\_urls], $\\$[saliency\_maps], [candidat\_landmarks] )$\\
+\textbf{Output}: $Y_{3b} = (latitude, longitude, bearing,  [image\_urls], [candidate\_landmarks] )$ 
 
 This step is implemented in the same manner as Step 3 of the Machine-Machine pipeline, except that the landmark search (watershed) component is not needed as all candidate landmarks include bounding boxes.
 
-\subsubsection*{Step 4: Human-based Landmark Description}
-
-\textbf{Input}: $X_4 = Y_{3a} \cup Y_{3b} = (latitude, longitude, bearing, [image_urls], [saliency_matrices], [annotated_image_urls])$ 
-\textbf{Output}: $Y_4 = (latitude, longitude, bearing, [image_urls], [saliency_matrices], [annotated_image_urls])$ 
+\subsubsection*{Step 4: Human-based Landmark Description}~\\
+\noindent\textbf{Input}: $X_4 = Y_{3a} \cup Y_{3b} = (latitude, longitude, bearing, $\\$[image\_urls], [saliency\_matrices], [annotated\_image\_urls])$ \\
+\textbf{Output}: $Y_4 = (latitude, longitude, bearing, [image\_urls],$\\$ [saliency\_matrices], [annotated\_image\_urls])$ 
 
 For each landmark $c$ in the set of candidate landmarks $C$, we utilize the human-based description method described in the Saliency section to obtain a lexical description of $c$. These descriptions are included in the given candidate landmark tuple in the output of this step. This step does not complete until all candidate landmarks have been processed through MTurk.
 
-\subsubsection*{Step 5: Select Most Salient Landmark}
-
-\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_5 = (latitude, longitude, bearing, best_landmark)$
+\subsubsection*{Step 5: Select Most Salient Landmark}~\\
+\noindent\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing,  [image\_urls], $\\$[saliency\_maps], [candidate\_landmarks] )$\\
+\textbf{Output}: $Y_5 = (latitude, longitude, bearing, best\_landmark)$
  
 This step is implemented in the same manner as Step 4 of the Machine-Machine pipeline.
 
-\subsubsection*{Step 6: Cleanup}
-
-\textbf{Input}: $X_6 = Y_5 = (latitude, longitude, bearing, best_landmark)$
-\textbf{Output}: $Y_6 = (best_landmark)$
+\subsubsection*{Step 6: Cleanup}~\\
+\noindent\textbf{Input}: $X_6 = Y_5 = (latitude, longitude, bearing, best\_landmark)$\\
+\textbf{Output}: $Y_6 = (best\_landmark)$
 
 This step is implemented in the same manner as Step 5 of the Machine-Machine pipeline.
 
 \subsection{Human-Human}
-\textbf{Input}: $X_0 = (latitude, longitude, bearing)$
-\textbf{Output}: The most salient landmark, including a description for use in navigation instructions
+\noindent\textbf{Input}: $X_0 = (latitude, longitude, bearing)$\\
+\textbf{Output}: The most salient landmark, including a description for use in navigation instructions\\
 \textbf{Candidate selection}: Description
 
 \begin{figure}[htbp]
@@ -576,49 +576,45 @@ This step is implemented in the same manner as Step 5 of the Machine-Machine pip
   \label{fig:pipeline:hh}
 \end{figure}
 
-\subsubsection*{Step 1: Load Streetview Image}
-\textbf{Input}: $X_1 = X_0 = (latitude, longitude, bearing)$
-\textbf{Output}: $Y_1 = (latitude, longitude, bearing, [image_urls])$
+\subsubsection*{Step 1: Load Streetview Image}~\\
+\noindent\textbf{Input}: $X_1 = X_0 = (latitude, longitude, bearing)$\\
+\textbf{Output}: $Y_1 = (latitude, longitude, bearing, [image\_urls])$
 
 This step is implemented in the same manner as Step 1 of the Machine-Machine pipeline.
 
-\subsubsection*{Step 2: Human Saliency Detection} 
-\textbf{Input}: $X_{2} = Y_1 = (latitude, longitude, bearing, [image_urls])$
-\textbf{Output}: $Y_{2} = (latitude, longitude, bearing, [image_urls], [saliency_matrices])$ 
+\subsubsection*{Step 2: Human Saliency Detection}~\\
+\noindent\textbf{Input}: $X_{2} = Y_1 = (latitude, longitude, bearing, [image\_urls])$\\
+\textbf{Output}: $Y_{2} = (latitude, longitude, bearing, [image\_urls], [saliency\_matrices])$ 
 
 This step is implemented in the same manner as Step 2a of the Human-Machine pipeline.
 
-\subsubsection*{Step 3a: Create annotated maneuver point images}
-\textbf{Input}: $X_{3a} = Y_2 = (latitude, longitude, bearing, [image_urls], [saliency_matrices])$ 
-\textbf{Output}: $Y_{3a} = (latitude, longitude, bearing, [image_urls], [saliency_matrices], [annotated_image_urls])$ 
+\subsubsection*{Step 3a: Create annotated maneuver point images}~\\
+\noindent\textbf{Input}: $X_{3a} = Y_2 = (latitude, longitude, bearing, [image\_urls], [saliency\_matrices])$ \\
+\textbf{Output}: $Y_{3a} = (latitude, longitude, bearing, [image\_urls], $\\$[saliency\_matrices], [annotated\_image\_urls])$ 
 
 This step is implemented in the same manner as Step 3a of the Machine-Human pipeline.
 
-\subsubsection*{Step 3b: Visual Saliency Scoring}
-
-\textbf{Input}: $X_{3b} = Y_2 = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_{3b} = (latitude, longitude, bearing,  [image_urls], [candidate_landmarks] )$ 
+\subsubsection*{Step 3b: Visual Saliency Scoring}~\\
+\noindent\textbf{Input}: $X_{3b} = Y_2 = (latitude, longitude, bearing, $\\$ [image\_urls], [saliency\_maps], [candidate\_landmarks] )$\\
+\textbf{Output}: $Y_{3b} = (latitude, longitude, bearing,  [image\_urls], [candidate\_landmarks] )$ 
 
 This step is implemented in the same manner as Step 3 of the Machine-Machine pipeline, except that the landmark search (watershed) component is not needed as all candidate landmarks include bounding boxes.
 
-\subsubsection*{Step 4: Human-based Landmark Description}
-
-\textbf{Input}: $X_4 = Y_{3a} \cup Y_{3b} = (latitude, longitude, bearing, [image_urls], [saliency_matrices], [annotated_image_urls])$ 
-\textbf{Output}: $Y_4 = (latitude, longitude, bearing, [image_urls], [saliency_matrices], [annotated_image_urls])$ 
+\subsubsection*{Step 4: Human-based Landmark Description}~\\
+\noindent\textbf{Input}: $X_4 = Y_{3a} \cup Y_{3b} = (latitude, longitude, bearing, [image\_urls],$\\$ [saliency\_matrices], [annotated\_image\_urls])$ \\
+\textbf{Output}: $Y_4 = (latitude, longitude, bearing, [image\_urls], $\\$[saliency\_matrices], [annotated\_image\_urls])$ 
 
 This step is implemented in the same manner as Step 4 of the Machine-Human pipeline.
 
-\subsubsection*{Step 5: Select Most Salient Landmark}
-
-\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing,  [image_urls], [saliency_maps], [candidate_landmarks] )$
-\textbf{Output}: $Y_5 = (latitude, longitude, bearing, best_landmark)$
+\subsubsection*{Step 5: Select Most Salient Landmark}~\\
+\noindent\textbf{Input}: $X_5 = Y_4 = (latitude, longitude, bearing,  [image\_urls],$\\$ [salienc\y_maps], [candidate\_landmarks] )$\\
+\textbf{Output}: $Y_5 = (latitude, longitude, bearing, best\_landmark)$
  
 This step is implemented in the same manner as Step 4 of the Human-Machine pipeline.
 
-\subsubsection*{Step 6: Cleanup}
-
-\textbf{Input}: $X_6 = Y_5 = (latitude, longitude, bearing, best_landmark)$
-\textbf{Output}: $Y_6 = (best_landmark)$
+\subsubsection*{Step 6: Cleanup}~\\
+\noindent\textbf{Input}: $X_6 = Y_5 = (latitude, longitude, bearing, best\_landmark)$\\
+\textbf{Output}: $Y_6 = (best\_landmark)$
 
 This step is implemented in the same manner as Step 5 of the Machine-Machine pipeline.
 
