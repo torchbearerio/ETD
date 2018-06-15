@@ -1,3 +1,15 @@
 \chapter{Conclusion}\label{conclusion}
 
-\LaTeX{} produces documents that look great, automatically handles references and citations, and easily incorporates figures and tables.  This is not a guide to \LaTeX{} but rather an introduction to the MSU style.  If you want more information about \LaTeX{} many introductory guides can be found online.
+We proposed Torchbearer, a system that uses multiple pipeline-based approaches to automatically generate landmark descriptions for use in navigation instructions. Each pipeline leveraged a different combination of human, crowd-sourced input and algorithmic approaches, including object detection, deep saliency detection and geosocial data mining. Together with a mobile application, each of these pipelines can be used to generate provide spoken turn-by-turn driving directions, inclusive of landmark descriptions.
+
+While the goal of Torchbearer was to reduce cognitive load, erratic driving behavior and perceived workload for drivers, our field study did not find evidence of any significant effect on these metrics between Torchbearer pipelines and a street name only control pipeline. We suspect that a larger study is needed, with better controls for prior route knowledge, to accurately determine if such an effect exists.
+
+The primary point for future work centers around additional field evaluation, with more subjects, and a driving simulator to analyze different road types and environments. Additionally, experiments should be undertaken regarding landmark location, including the efficacy of including landmarks along the leg of a route to indicate to a driver that she is on the correct route. The object detection algorithm should be trained to recognize additional types of road infrastructure, such as crosswalks.
+
+A count-based approach should be investigated, where the edge between two maneuver points is analyzed for recurring salient landmarks of the same type, such as stop lights, and an instruction of the form "turn left onto <street> at the <$n$th stop light" presented. The counter-approach could also be investigated, where the recurrence along an edge of a landmark type counts against the saliency, such that a landmark would only be chosen if the driver will not encounter one of that type until the maneuver point.
+
+Further insight into semantic saliency can be gained by additional mining of geosocial data: while we currently consider overall check-in data, a data source such as Facebook or Instagram could be used to determine the relevance of a landmark to an individual driver. For example, if a Walgreens pharmacy is a candidate landmark, its saliency score could account for the fact that the driver has visited a Walgreens store on $n$ previous occasions.
+
+Much of these additional areas of investigation will alter only the portion of the Torchbearer system which selects the best landmark---existing methods for finding and describing landmarks will be used. In this way, Torchbearer has provided a robust base against which future landmark-based navigation systems can be built.
+
+Fin

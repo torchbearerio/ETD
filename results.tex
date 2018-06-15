@@ -9,7 +9,7 @@ To evaluate the differences in efficiency, cost and solution overlap we created 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.6\textwidth]{images/POLYLINE.pdf}
-  \caption{A hypothetical intersection in the SF test set. The grey line is a polyline representative of the selected route leading into the intersection. To find the bearing for the bearing value for the Torchbearer maneuver point we calculate the angle w.r.t. due north between the two points outlined in black.}
+  \caption{A hypothetical intersection in the SF test set. The grey line is a polyline representative of the selected route leading into the intersection. To find the bearing value for the Torchbearer maneuver point we calculate the angle w.r.t. due north between the two points outlined in black.}
   \label{fig:polyline}
 \end{figure}
 
@@ -24,7 +24,7 @@ The cost incurred for the processing of each maneuver point is recorded in the T
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{images/plot_cost.pdf}
-  \caption{}
+  \caption{Marginal cost by pipeline}
   \label{fig:plot:cost}
 \end{figure}
 
@@ -43,7 +43,7 @@ We record the start and end timestamps for each execution; the difference betwee
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{images/plot_executiontime.pdf}
-  \caption{}
+  \caption{End-to-end execution time by pipeline}
   \label{fig:plot:executiontime}
 \end{figure}
 
@@ -61,7 +61,7 @@ For each pipeline, we evaluate the mean time required to complete each task. Thi
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{images/timeline_mm.pdf}
-  \caption{}
+  \caption{Execution time by task (Machine-Machine pipeline)}
   \label{fig:plot:timeline:mm}
 \end{figure}
 
@@ -71,7 +71,7 @@ Figure \ref{fig:plot:timeline:mm} shows that the lion's share of processing time
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{images/timeline_mh.pdf}
-  \caption{}
+  \caption{Execution time by task (Machine-Human pipeline)}
   \label{fig:plot:timeline:mh}
 \end{figure}
 
@@ -81,7 +81,7 @@ Figure \ref{fig:plot:timeline:mh} makes clear that the human landmark descriptio
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{images/timeline_hm.pdf}
-  \caption{}
+  \caption{Execution time by task (Human-Machine pipeline)}
   \label{fig:plot:timeline:hm}
 \end{figure}
 
@@ -91,7 +91,7 @@ Figure \ref{fig:plot:timeline:hm} shows that the Human-Machine pipeline suffers 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{images/timeline_hh.pdf}
-  \caption{}
+  \caption{Execution time by task (Human-Human pipeline)}
   \label{fig:plot:timeline:hh}
 \end{figure}
 
@@ -186,7 +186,7 @@ To evaluate the efficacy of each of our approaches for reducing driver cognitive
 
 We evaluate each of Torchbearer's four pipelines against a control pipeline which delivers instructions containing no landmarks. The control pipeline is comparable to a mainstream navigation application, such as Google Maps, which provides only street names and distances in its instructions.
 
-Using a within-subjects design, five subjects drove an identical route through downtown Bozeman, Montana, using only the Torchbearer app for navigation (shown in \ref{fig:route}). This route was divided into five legs, with a different pipeline being used for navigation of each leg. After the completion of each leg, the subject was given asked to complete the NASA-TLX survey. The landmarks used for each pipeline and route leg can be seen in Appendix \ref{appendix:route}.
+Using a within-subjects design, five subjects drove an identical route through downtown Bozeman, Montana, using only the Torchbearer app for navigation (shown in \ref{fig:route}). This route was divided into five legs, with a different pipeline being used for navigation of each leg. After the completion of each leg, the subject was given asked to complete the NASA-TLX survey. A sample of landmarks used for each pipeline and route leg can be seen in Appendix \ref{appendix:route}.
 
 \begin{figure}[htbp]
   \centering
@@ -249,7 +249,7 @@ Using an Analysis of Variance (ANOVA) evaluation based on the linear model in Eq
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.6\textwidth]{images/plot_responsetime.pdf}
-  \caption{}
+  \caption{PDT response time by pipeline}
   \label{fig:plot:responsetime}
 \end{figure}
 
@@ -258,7 +258,7 @@ We also found no evidence of pipeline affecting PDT miss rate ($F(4, 12) = 0.46$
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.6\textwidth]{images/plot_misses.pdf}
-  \caption{}
+  \caption{PDT miss rate by pipeline}
   \label{fig:plot:missrate}
 \end{figure}
 
@@ -293,7 +293,7 @@ Using the analysis as for the PDT metrics, we found no evidence that pipeline af
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.6\textwidth]{images/plot_acc.pdf}
-  \caption{}
+  \caption{Gravitational force events by pipeline}
   \label{fig:plot:acc}
 \end{figure}
 
@@ -307,7 +307,7 @@ We evaluate each sub-scale independently, so that individual effects can be pars
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{images/plot_tlx.pdf}
-  \caption{}
+  \caption{NASA-TLX scores by sub-scale}
   \label{fig:plot:tlx}
 \end{figure}
 
@@ -353,7 +353,7 @@ In Figure \ref{fig:plot:likert} we show the distribution of agreement with each 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.5\textwidth]{images/plot_likert.pdf}
-  \caption{}
+  \caption{Landmark effectiveness survey scores}
   \label{fig:plot:likert}
 \end{figure}
 
@@ -390,5 +390,7 @@ Without a larger study, it is not possible to definitely say whether or not any 
 \section{Threats to Validity}
 
 As alluded to previously, the principal threat to validity is the extremely small sample size employed in our field experiments. However, even within this small-scale study there are potential biases: first, study participants had relatively high familiarity with area of the route, given that all were residents of Bozeman, Montana. If landmark descriptions are more helpful in terms of cognitive load, erratic driving reduction or reduced task load in areas drivers are unfamiliar with, we would significantly underestimate the effect.
+
+Due to time constraints, and the naturalistic experiment as opposed to a simulated one, each leg of the test route did not include a large number of maneuver points. Additionally, there was little variation in terms of road and environment type (surface versus highway, urban versus rural). A simulator-based experiment could allow for efficiently varying the driving environment.
 
 Subjects may have been predisposed to "like" the concept of including landmarks in navigation instructions, even if there was no observable effect in terms of workload or driving behavior. This could potentially bias the results of the "confidence at maneuver points" survey---if subjects felt like they were "supposed" to like landmarks, they may have been inclined to indicate an increased sense of confidence.
