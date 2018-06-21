@@ -83,7 +83,14 @@ It is important to note that while this endpoint will immediately return all man
 This endpoint accepts a maneuver point’s unique identifier and a pipeline as input and returns a description of the landmark computed for that maneuver point using that pipeline, if one is available. This endpoint is used for checking if Torchbearer has completed processing a maneuver point after the initial route has been returned. For example, if a client navigation application did not yet know the landmark description for an upcoming maneuver point, it might query this endpoint immediately prior to speaking a navigation instruction, to see if a landmark description was now available.
 
 \section{User Interface}\label{sec:arch:ui}
-Users interact with Torchbearer via a native mobile application, developed for both iOS and Android devices. The application has two principal functionalities: first, the ability to search for a destination and submit the route to the Torchbearer system, second, the delivery of spoken turn-by-turn navigation instructions containing the landmark description-based instructions created by one of Torchbearer’s pipelines.
+Users interact with Torchbearer via a native mobile application, developed for both iOS and Android devices. The primary screen of the application is shown in Figure \ref{fig:ui}. The application has two principal functionalities: first, the ability to search for a destination and submit the route to the Torchbearer system, second, the delivery of spoken turn-by-turn navigation instructions containing the landmark description-based instructions created by one of Torchbearer’s pipelines.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.3\textwidth]{images/ui.png}
+  \caption{The Torchbearer mobile application for spoken navigation instructions.}
+  \label{fig:ui}
+\end{figure}
 
 Usage of the application during a typical navigation consists of the following flow: first, the user selects the pipeline they wish to use for computing instructions. By default, the application selects the machine-machine pipeline, which we discuss in a subsequent section. Second, the user enters a desired destination using the keyboard or text-to-speech capability of her device. The destination can be an address, business, point-of-interest, or general area, such as a city. Using geocoding services provided by Google, the application determines the most relevant geographical coordinates for the destination description entered by the user. The geocoding service takes into account the provided description and the user's current location in determining the most likely destination. The app displays the address derived by the geocoding service to the user, and asks her to confirm its correctness.
 
@@ -91,7 +98,7 @@ After confirmation from the user, the application submits an HTTP POST request t
 
 At this point, the application delivers a spoken instruction to the user for the first maneuver point in the route, and the user begins driving. This begins the \textit{check-speak-repeat} loop: at a distance of one-half mile from the proximate maneuver point, the application checks whether it received a landmark description for the maneuver point from Route Manager, as part of the initial route request. If not, it sends an HTTP GET request to Route Manager seeking an updated instruction. If the processing for the maneuver point is now complete, Route Manager responds with the updated instruction. 
 
-At a distance of one-quarter mile from the maneuver point, the application alerts the user to the upcoming maneuver via a spoken direction of the form \textit{``in one-quarter mile, [action] at the [landmark] onto [street]"} where \textt{action} is a predefined description of the maneuver to be performed, such as “turn right” or “merge”, \texttt{landmark} is the landmark description computed by Torchbearer, and \texttt{street} is the name of the street onto which the maneuver will take the user. In the case where no landmark description is available, either because the pipeline did not finish processing the maneuver point in time or was unable to compute a description, the ``at the [landmark]" portion of the instruction is omitted. At a distance of 25-feet the application will speak an instruction of the form ``[action] at the [landmark] onto [street]". When the user passes through the maneuver point, executing the maneuver, the \textit{check-speak-repeat} iteration for the current maneuver is complete.
+At a distance of one-quarter mile from the maneuver point, the application alerts the user to the upcoming maneuver via a spoken direction of the form \textit{``in one-quarter mile, [action] at the [landmark] onto [street]"} where \texttt{action} is a predefined description of the maneuver to be performed, such as “turn right” or “merge”, \texttt{landmark} is the landmark description computed by Torchbearer, and \texttt{street} is the name of the street onto which the maneuver will take the user. In the case where no landmark description is available, either because the pipeline did not finish processing the maneuver point in time or was unable to compute a description, the ``at the [landmark]" portion of the instruction is omitted. At a distance of 25-feet the application will speak an instruction of the form ``[action] at the [landmark] onto [street]". When the user passes through the maneuver point, executing the maneuver, the \textit{check-speak-repeat} iteration for the current maneuver is complete.
 
 While the \textit{check-speak-repeat} routine is the same for alerting the user of arrival at their final destination as for intermediate maneuver points, the delivery varies slightly: immediately after completing the second-to-last maneuver (the last maneuver being arrival at the destination) the application speaks an instruction of the form \textit{``In [distance] your destination is the [landmark] on the [side] of the street"} where \texttt{side} is either ``left" or ``right".
 
@@ -163,7 +170,16 @@ Pipelines are referenced via a method-method notation, where method can be eithe
 
 While the exact manner in which a pipeline solves the landmark description problem varies from pipeline to pipeline, all pipelines share a general sequence of execution, and all take a tuple consisting of latitude, longitude and bearing as input and yield a tuple containing the best, most salient selected landmark as output.
 
-The first step in any pipeline is to obtain a street-level image of the maneuver point at the given geographic coordinate and bearing (number 1 in Figure \ref{fig:pipeline:overview}). No matter the exact approach the pipeline takes to obtaining a landmark description, it will need this image to perform its determination. Next, the pipeline must generate a set of candidate landmarks, $C$. A candidate landmark is simply an object at the maneuver point that could be used as the basis for a landmark-based instruction; we know nothing about how salient the landmark is, however. 
+The first step in any pipeline is to obtain street-level images of the maneuver point at the given geographic coordinate and bearing (number 1 in Figure \ref{fig:pipeline:overview}). For each maneuver point, Torchbearer gathers street-level images from three points relative to the maneuver point: ``at", ``just before" and ``before" the intersection, corresponding to 25, 50 and 100 feet, respectively. (See Figure \ref{fig:sv}.) When directions are spoken to the end user, these positions are inverted, into ``at", ``just after" and ``after", describing the position of the maneuver point relative to the image the selected landmark was found in.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{images/sv.pdf}
+  \caption{The positions of street-level images relative to a maneuver point.}
+  \label{fig:sv}
+\end{figure}
+
+No matter the exact approach the pipeline takes to obtaining a landmark description, it will need these images to perform its determination. Next, the pipeline must generate a set of candidate landmarks, $C$. A candidate landmark is simply an object at the maneuver point that could be used as the basis for a landmark-based instruction; we know nothing about how salient the landmark is, however. 
 	
 Generation of the candidate landmark set is performed implicitly by either the saliency or description step, depending on the specific pipeline. Pipelines which leverage human-based description rely on the saliency step (whether human or machine-based) to generate a candidate set (step 2 in Figure \ref{fig:pipeline:overview}). Pipelines which use machine-based landmark description generate a candidate landmark set as part of the description step (step 3 in Figure \ref{fig:pipeline:overview}).
 
@@ -175,7 +191,7 @@ The saliency step of a pipeline is responsible for quantifying the saliency of c
 \subsubsection{The Human Approach}\ref{Sect:sal:human}
 Humans are accustomed to picking out landmarks from their surroundings in day-to-day life, be it for giving a friend directions or for their own internalization of a route or location. We can take advantage of this innate ability by asking a human MTurk worker to select what they believe is the most salient, most standout landmark at a given maneuver point. Unlike algorithmic saliency detection, here we do not separate the concept of saliency into its visual and semantic subparts. Rather, we hypothesize that, because human workers have an elemental understanding of what makes a landmark salient, the decisions they make regarding the best landmark at a given point implicitly incorporate these saliency concepts.
 
-We gather human saliency detection input via an MTurk HIT, denoted a ``Saliency HIT". The Saliency HIT must be completed by five workers, and consists of the following task: after the worker elects to work on the HIT, he is shown a high-resolution image of the maneuver point in question from three distances (at, just before, and before the point, corresponding to 10, 50, and 100 feet, respectively). Note that all three of these images are of equal dimensions. The HIT instructs the worker to use his mouse to draw a bounding box tightly around the object that he believes is the best landmark---the one he would use if he were telling a driver to perform the given maneuver right at that point. The worker can choose an object in any of the three images, but can only select one object.
+We gather human saliency detection input via an MTurk HIT, denoted a ``Saliency HIT". The Saliency HIT must be completed by five workers, and consists of the following task: after the worker elects to work on the HIT, he is shown a high-resolution image of the maneuver point in question from three distances (at, just before, and before the point, corresponding to 25, 50, and 100 feet, respectively). Note that all three of these images are of equal dimensions. The HIT instructs the worker to use his mouse to draw a bounding box tightly around the object that he believes is the best landmark---the one he would use if he were telling a driver to perform the given maneuver right at that point. The worker can choose an object in any of the three images, but can only select one object.
 
 We offer the worker three images from three distances so that landmarks of different scales can be captured: a stop sign, for example, is hard to detect in an image from far away, but is prevalent in an image from right near the maneuver point. Likewise, a large building may be an excellent landmark, but might only be visible from some distance away from the maneuver point. In essence, we are showing the worker the approach to, or the path leading up to, the landmark, and allowing them to see what the driver would see at three points along this path. In the final instruction spoken to the driver, we take into account the position of the best landmark---that is, if the best landmark is one which was selected from the “just before” image, the spoken instruction will tell the driver to turn “just after” the specified landmark.
 
@@ -225,7 +241,7 @@ The second half of the landmark selection problem consists of deriving a lexical
 
 \subsubsection{The Human Approach}\label{Sect:desc:human}
 To gather human descriptions for a given landmark, we again leverage Mechanical Turk. However, instead of using a sampling approach as we did with saliency crowdsourcing, we use a verification approach.
-First, for a candidate landmark $c$, we annotate the street-level image of the maneuver point for which this landmark is a candidate to include a bounding box drawn around the landmark. We create an MTurk HIT is with only a single assignment; the worker is shown this image and asked to describe the object enclosed in the bounding box. The exact format of the question is: \texit{``Provide a specific description of the main object in the box. Describe PERMANENT, man-made things--NOT cars, people or things that could move. Pretend you were using that object as a landmark when giving someone directions."} The Torchbearer-hosted webpage presents the worker with a text box into which to type their answer.
+First, for a candidate landmark $c$, we annotate the street-level image of the maneuver point for which this landmark is a candidate to include a bounding box drawn around the landmark. We create an MTurk HIT is with only a single assignment; the worker is shown this image and asked to describe the object enclosed in the bounding box. The exact format of the question is: \textit{``Provide a specific description of the main object in the box. Describe PERMANENT, man-made things--NOT cars, people or things that could move. Pretend you were using that object as a landmark when giving someone directions."} The Torchbearer-hosted webpage presents the worker with a text box into which to type their answer.
 
 After the worker has submitted the description, we create a verification HIT on MTurk, with three assignments. The annotated maneuver point image, along with the candidate description, is shown to each worker. The worker is asked to decide whether the description is accurate and meets the criteria of describing “permanent, man-made things--not cars, people or things that could move”. Three radio buttons are displayed—--``Description is accurate" and ``Description is inaccurate and the landmark is valid", and ``not a valid landmark".
 
@@ -245,6 +261,15 @@ We compute the relative bearing between the venue and the approach bearing of th
 \end{equation}
 
 This measure captures both the local significance and wide-area ubiquity of the landmark. Note that all saliency scores are relative, and are meant to be compared against other candidate landmarks at a maneuver point.
+
+We determine the position of the landmark relative to the maneuver point based on its proximity to the maneuver point: if within 50 feet, the position is ``at". If not, the position is ``after". These positions are inverted (into ``at" and ``before", respectively) if the landmark is selected for inclusion in a spoken instruction to an end user. Figure \ref{fig:positions} shows this determination.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{images/positions.pdf}
+  \caption{Determining landmark position for data-driven description approach. We consider landmarks within the 50-foot inner radius to have a position of ``at", and those within the 100-foot outer radius to have a position of ``"after". For example, landmark $L$ in this diagram would have a position of ``after".}
+  \label{fig:positions}
+\end{figure}
 
 \subsubsection{Object detection approach}
 Some landmarks are ubiquitous and proven to be highly semantically salient, independent of the maneuver point's geographic location. Road infrastructure, such as stop signs and traffic lights, is a prime example: these landmarks are universally recognizable among drivers, and have been shown to serve as excellent landmarks for use in navigation instructions \cite{may_ross_bayer_2005}. Unfortunately, we found no dataset of street signage or traffic lights with coverage beyond a specific locality. Instead, we leverage a state-of-the-art object detection algorithm, Faster-RCNN \cite{ren2015faster}, to detect stop signs and traffic lights at maneuver points. Note that as a direction for future research, extending the object detection model to include other types of landmarks is both feasible and potentially beneficial.
@@ -445,7 +470,7 @@ To find the similarity of a landmark $c$ as compared to all other landmarks in a
 \noindent \textbf{Input}: $X_1 = (latitude, longitude, bearing)$\\
 \textbf{Output}: $Y_1 = (latitude, longitude, bearing, [image\_urls])$
 
-This step consists of querying the Google Streetview API for street-level imagery at distances of 25, 50 and 100 feet from the given coordinate at an angle opposite of the bearing. (We refer to these distances relatively as ``at", ``just before" and ``before".) We store returned images on Amazon Simple Storage Service (S3), and include the S3 URL of each in a tuple which is included in the output of this step. 
+This step consists of querying the Google Streetview API for street-level imagery at distances of 25, 50 and 100 feet from the given coordinate at an angle opposite of the bearing, as shown in Figure \ref{fig:sv}. (We refer to these distances relatively as ``at", ``just before" and ``before".) We store returned images on Amazon Simple Storage Service (S3), and include the S3 URL of each in a tuple which is included in the output of this step. 
 
 \subsubsection*{Step 2a: Computer Vision Saliency Detection}~\\
 \noindent\textbf{Input}: $X_{2a} = Y_1 = (latitude, longitude, bearing, [image\_urls])$\\
@@ -497,7 +522,7 @@ At this point in the pipeline, we have a set of candidate landmarks, each comple
 \begin{equation}
     score_{component} = \frac{c_{score}}{max_{i \in C}(i_{score})}
 \end{equation}
-where $i_score$ is the score for landmark $i$ for a given component.
+where $i_{score}$ is the score for landmark $i$ for a given component.
 
 The total saliency score for a candidate is then the sum of the three normalized scores. 
 
