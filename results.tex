@@ -2,6 +2,8 @@
 
 Our aim with these analyses is to understand the effectiveness of human versus machine methodologies for landmark selection and to determine the efficacy of the overall system for improving drivers' cognitive load and performance during navigation. We analyze the Torchbearer system on two fronts: first, we examine the differences between pipelines on a performance and efficiency level, comparing execution cost, execution time and similarity between results. Second, we perform a field study with real drivers using the Torchbearer system to navigate along a route unknown to them, comparing cognitive load, driving performance and perceived task difficulty between all four pipelines and a control.
 
+We leverage ANOVA-based analyses throughout this section to determine if pipeline has a significant effect on the variable of interest. Note that in all statistical analyses used throughout this section, requirements for normal distribution are tested by visual analysis of the Q-Q plot. Homogeneity of variance is tested via Levene's Test at a significance level of $0.05$. If either of these assumptions fail, we utilize the Kruskal-Wallis analysis in place of ANOVA. 
+
 \section{Pipeline Comparison}
 
 To evaluate the differences in efficiency, cost and solution overlap we created a test set of 400 maneuver points in San Francisco, California, using an existing dataset of geographic coordinates for all intersections in the city \cite{sfIntersections}. Maneuver points were created at random by selecting an intersection and a route leading into it; the bearing for the maneuver point was computed by measuring the angle between the two points closest to the intersection in a poly line representation of the route (see Figure \ref{fig:polyline}).
@@ -36,7 +38,7 @@ The results for the Human-Machine pipeline are similarly deterministic---this pi
 
 This non-determinism due to verification is also a likely explanation of the variance observed in the Human-Machine pipeline. However, variance is less than the Machine-Human pipeline, which we attribute to humans' seeming ability to select more meaningful landmarks during the saliency step than the SalNet-based saliency approach. In other words, it is possible that the machine approach to saliency sometimes selects salient regions, which do not contain an object that can be easily described, and contention is created among and between the describing workers and verification workers. This leads to more ``loops" of the description step when workers don't agree, and therefore a higher execution cost.
 
-The relatively high costs of the human-based pipeline may not render them impractical, however. Since the street-level imagery used buy Torchbearer is not (currently) realtime, updated on a scale of years, a given maneuver point only needs to be processed by Torchbearer on a relatively rare frequency. Thus, if a particular pipeline proves to be expensive, but highly useful for drivers, it might be worth bearing that cost on an $n$-year cycle. Of course if realtime imagery is used, the Machine-Machine pipeline may be the only economically viable option. 
+The relatively high costs of the human-based pipeline may not render them impractical, however. Since the street-level imagery used by Torchbearer is not (currently) realtime, updated on a scale of years, a given maneuver point only needs to be processed by Torchbearer on a relatively rare frequency. Thus, if a particular pipeline proves to be expensive, but highly useful for drivers, it might be worth bearing that cost on an $n$-year cycle. Of course if realtime imagery is used, the Machine-Machine pipeline may be the only economically viable option. 
 
 Torchbearer is able to amortize costs by storing landmark descriptions for every maneuver point it processes. Thus, only the first request for a given maneuver point/pipeline combination will require processing by the pipeline. Costs are amortized by the number of requests received between updates of the street-level imagery source.
 
@@ -160,8 +162,6 @@ Pipelines use two separate methods for describing candidate landmarks: human-bas
 
 Considering only those landmarks which had an IoU of greater than 0.5, we compute the vector space embedding for each generated description, and then find the cosine similarity between those two embeddings. Table \ref{tab:descriptionsimilarity} reports the mean cosine similarity between landmark description for each pair of pipelines.
 
-
-
 \begin{table}[htbp]
   \centering
   \caption{Mean Cosine Similarity Between Selected Landmarks (normalized between [0,1])}
@@ -188,13 +188,13 @@ Human-Machine   &      &      & 0.18
 
 \section{Field Experiments}
 
-To evaluate the efficacy of each of our approaches for reducing driver cognitive load and improving driving performance, we conduct a Institutional Review Board approved naturalistic driving study (real driver, real vehicles, real roads) in which subjects navigate along a route unknown to them using the Torchbearer system. (The Human Subjects Consent Form for these experiments can be found in Appendix \ref{append:consent}.) It must be noted up front that, due to constraints on time and resources, a full-scale human factors study is out of the scope of this work. While the experimental design we discuss could be applied to a larger sample and potentially yield significant results, here we use a sample size of five human subjects. Along with contributing a experimental design for future work, this small-scale study provides exploratory evidence as to the effectiveness of the Torchbearer system.
+To evaluate the efficacy of each of our approaches for reducing driver cognitive load and improving driving performance, we conduct a Institutional Review Board approved instrumented-vehicle driving study (real driver, real vehicles, real roads) in which subjects navigate along a route unknown to them using the Torchbearer system. (The Human Subjects Consent Form for these experiments can be found in Appendix \ref{append:consent}.) It must be noted up front that, due to constraints on time and resources, a full-scale human factors study is out of the scope of this work. While the experimental design we discuss could be applied to a larger sample and potentially yield significant results, here we use a sample size of five human subjects. Along with contributing a experimental design for future work, this small-scale study provides exploratory evidence as to the effectiveness of the Torchbearer system.
 
 \subsection{Experimental Design}
 
 We evaluate each of Torchbearer's four pipelines against a control pipeline which delivers instructions containing no landmarks. The control pipeline is comparable to a mainstream navigation application, such as Google Maps, which provides only street names and distances in its instructions.
 
-Using a within-subjects design, five subjects drove an identical route through downtown Bozeman, Montana, using only the Torchbearer app for navigation (shown in Figure \ref{fig:route}). This route was divided into five legs, with a different pipeline being used for navigation of each leg. After the completion of each leg, the subject was given asked to complete the NASA-TLX survey, to measure perceived task load for that leg and pipeline. A sample of landmarks used for each pipeline and route leg can be seen in Appendix \ref{appendix:route}.
+Using a within-subjects design, five subjects drove an identical route through downtown Bozeman, Montana, using only the Torchbearer app for navigation (shown in Figure \ref{fig:route}). The route was selected due to its grid (city block) layout, offering many locations for turns and a wide variety of landmarks (residential, business, and street infrastructure.) It allowed for incorporating a large number of maneuvers into the allocated 60-minute experiment time frame. This route was divided into five legs, with a different pipeline being used for navigation of each leg. After the completion of each leg, the subject was given asked to complete the NASA-TLX survey, to measure perceived task load for that leg and pipeline. A sample of landmarks used for each pipeline and route leg can be seen in Appendix \ref{appendix:route}.
 
 \begin{figure}[htbp]
   \centering
@@ -203,9 +203,9 @@ Using a within-subjects design, five subjects drove an identical route through d
   \label{fig:route}
 \end{figure}
 
-The subject was given no information about the route prior to the start of driving; the only information they were given throughout the drive was spoken by the Torchbearer app. 
+The subject was given no information about the route prior to the start of driving; the only information they were given throughout the drive was spoken by the Torchbearer app. Subjects were all white; two were male and three were female. All indicated they had at least some familiarity with the area of Bozeman in which the test route was located. Subjects were not compensated.
 
-Our experiment has two sources of nuisance variability, or blocking factors: the route leg and the subject (driver). Each leg of the route is likely to have differences in road type, normal traffic levels and availability of good landmarks. Subjects vary in their driving abilities, driving style (tendency to brake hard, turn quickly, etc.) and preexisting knowledge of the area in which the experiment is conducted. All of these characteristics can have an undesired effect on the variable of interest. 
+Our experiment has two sources of nuisance variability, or blocking factors: the route leg and the subject (driver). Each leg of the route is likely to have differences in road type, normal traffic levels and availability of good landmarks. Subjects vary in their driving abilities, driving style (tendency to brake hard, turn quickly, etc.), preexisting knowledge of the area in which the experiment is conducted, as well as global factors such as the time of day, weather, or traffic levels at the time the subject completed the trials. All of these characteristics can have an undesired effect on the variable of interest. 
 
 To control for these two blocking factors, we use a Latin squares design, which allows for controlling two sources of variation---subject and route leg---and isolates the treatment effect (pipeline). This is accomplished by requiring that each pipeline be analyzed on all route legs an equal number of times, and also that each subject be treated with each pipeline an equal number of times. A Latin square can be thought of as an $n$ by $n$ matrix, where rows represent a subject and columns represent a route leg, and $n$ is equal to the number of pipelines, subjects and route legs (five).
 
@@ -246,11 +246,11 @@ where $\overline{Y}$ is the grand mean, $P_i$ is the pipeline (treatment) effect
 
 \subsubsection{Peripheral Detection Task}
 
-To measure the effect of pipelines' landmark descriptions on cognitive load, we use a peripheral detection task (PDT). This secondary task consists of subjects wearing a headset, which positions an LED light approximately 15 degrees to the left of the center of vision and 2 degrees above the horizon. This light blinks at a uniform random interval between 3 and 5 seconds, for a duration of between 200 and 1000 milliseconds. A button is attached to the subject's finger, which can be pressed against the steering wheel. The subject is asked to depress the button as quickly as possible whenever they see the light blink. The average delay between light blink and button depression is recorded, along with a miss rate---if the subject fails to press the button within 2 seconds of a light blink, it counts as a miss. Intuitively, the more cognitive effort the subject must expend on the primary task of navigation and vehicle operation, the less effort they can put towards the PDT. Thus, a more cognitively-intensive primary task will result in a higher miss rate and longer button press delay.
+To measure the effect of pipelines' landmark descriptions on cognitive load, we use a peripheral detection task (PDT). This secondary task consists of subjects wearing a headset, which positions an LED light approximately 15 degrees to the left of the center of vision and 2 degrees above the horizon. This light blinks at a uniform random interval between 3 and 5 seconds, for a duration of between 200 and 1000 milliseconds \cite{martens2000measuring}. A button is attached to the subject's finger, which can be pressed against the steering wheel. The subject is asked to depress the button as quickly as possible whenever they see the light blink. The average delay between light blink and button depression is recorded, along with a miss rate---if the subject fails to press the button within 2 seconds of a light blink, it counts as a miss. Intuitively, the more cognitive effort the subject must expend on the primary task of navigation and vehicle operation, the less effort they can put towards the PDT. Thus, a more cognitively-intensive primary task will result in a higher miss rate and longer button press delay.
 
 The PDT must be evaluated on two levels---first the miss rate, the probability of a subject never pressing the button within 2 seconds of the LED blinking, and second the mean response time for non-missed blinks.
 
-Using an Analysis of Variance (ANOVA) evaluation based on the linear model in Equation \ref{eq:model}, where $Y$ is the PDT response time, we found no evidence supporting a difference in mean PDT response time between pipelines ($F(4, 12) = 1.38$, $p=0.29$). Figure \ref{fig:plot:responsetime} shows that differences in the mean are small relative to the large interquartile range.
+Using a Kruskal-Wallis evaluation based on the linear model in Equation \ref{eq:model}, where $Y$ is the PDT response time, we found no evidence supporting a difference in mean PDT response time between pipelines ($F(4, 12) = 1.38$, $p=0.29$). We use Kruskal-Wallis in place of ANOVA because the normality assumption is violated (by visual analysis of the Q-Q plot). Figure \ref{fig:plot:responsetime} shows that differences in the mean are small relative to the large interquartile range.
 
 \begin{figure}[htbp]
   \centering
@@ -259,7 +259,7 @@ Using an Analysis of Variance (ANOVA) evaluation based on the linear model in Eq
   \label{fig:plot:responsetime}
 \end{figure}
 
-We also found no evidence of pipeline affecting PDT miss rate ($F(4, 12) = 0.46$, $p=0.76$), using the same analysis as for response time. Figure \ref{fig:plot:missrate}  shows the distribution of miss rate by pipeline.
+We also found no evidence of pipeline affecting PDT miss rate ($F(4, 12) = 0.46$, $p=0.76$), using the same analysis as for response time. (The normality assumption was violated for this data as well.) Figure \ref{fig:plot:missrate}  shows the distribution of miss rate by pipeline.
 
 \begin{figure}[htbp]
   \centering
@@ -287,7 +287,7 @@ We also monitor for erratic, harsh, potentially dangerous driving patterns, by c
         \hline
         Right swerve & $X$ & $>0.05$ \\
         \hline
-        Left swerve & $X$ & $<-0.0.5$ \\
+        Left swerve & $X$ & $<-0.05$ \\
     \hline
     \end{tabu}
     \end{singlespace}
@@ -304,7 +304,7 @@ Using the same analysis as for the PDT metrics, we found no evidence that pipeli
 \end{figure}
 
 \subsubsection{Surveys}
-Lastly, we survey subjects using the NASA-TLX survey \cite{hart1988development} and our own Likert-scale survey to analyze perceived task difficulty as well as perceived landmark goodness, navigation confidence navigation difficulty between pipelines. Both surveys were administered for each pipeline, immediately following the completion of each leg.
+Lastly, we survey subjects using the NASA-TLX survey \cite{hart1988development} and our own Likert-scale survey to analyze perceived task difficulty, as well as perceived landmark goodness, navigation confidence, and navigation difficulty between pipelines. Both surveys were administered for each pipeline, immediately following the completion of each leg.
 
 The NASA-TLX survey consists of six sub-scales, which when combined aim to measure the total workload induced by the task---in this case navigating a route leg from start to finish using a particular pipeline for navigation. The scales are ordinal, with 20 levels ranging from \textit{very low} to \texit{very high}. (See Appendix \ref{appendix:tlx} for a full copy of the NASA-TLX survey.) The sub-scales are \textit{mental demand}, which measures the mental and perceptual acuity required to complete the task; \textit{physical demand}, which gauges how strenuous the task was; \textit{temporal demand}, which measures perceived time pressure or rush to complete the task; \textit{overall performance}, which indicates the subject's opinion of how successful she was at completing the task; \textit{effort}, a combined measure of mental and physical exertion; and \textit{frustration level}, how annoyed and irritated the subject felt during the task \cite{hart1988development}. \textbf{It is very important to note that the Performance sub-scale considers level 0 to equate to total success and level 20 to total failure, the opposite of what one might expect.}
 
@@ -399,6 +399,6 @@ Without a larger study, it is not possible to definitely say whether or not any 
 
 As alluded to previously, the principal threat to validity is the extremely small sample size employed in our field experiments. However, even within this small-scale study there are potential biases: first, study participants had relatively high familiarity with area of the route, given that all were residents of Bozeman, Montana. If landmark descriptions are more helpful in terms of cognitive load, erratic driving reduction or reduced task load in areas drivers are unfamiliar with, we would significantly underestimate the effect.
 
-Due to time constraints, and the naturalistic experiment as opposed to a simulated one, each leg of the test route did not include a large number of maneuver points. Additionally, there was little variation in terms of road and environment type (surface versus highway, urban versus rural). A simulator-based experiment could allow for efficiently varying the driving environment.
+Due to time constraints, and the instrumented-vehicle experiment as opposed to a simulated one, each leg of the test route did not include a large number of maneuver points. Additionally, there was little variation in terms of road and environment type (surface versus highway, urban versus rural). A simulator-based experiment could allow for efficiently varying the driving environment.
 
 Subjects may have been predisposed to "like" the concept of including landmarks in navigation instructions, even if there was no observable effect in terms of workload or driving behavior. This could potentially bias the results of the "confidence at maneuver points" survey---if subjects felt like they were "supposed" to like landmarks, they may have been inclined to indicate an increased sense of confidence.
